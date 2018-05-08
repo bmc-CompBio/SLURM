@@ -123,16 +123,16 @@ In order to have the job script considering i we slightly have to modify the cod
 
 now we can run the jobs dynamically
 	
-	 --export=i=1 sbatch bowtie_job.sh
-	 --export=i=2 sbatch bowtie_job.sh
-	 --export=i=3 sbatch bowtie_job.sh
-	 --export=i=4 sbatch bowtie_job.sh
-	 --export=i=5 sbatch bowtie_job.sh
-	 --export=i=6 sbatch bowtie_job.sh
-	 --export=i=7 sbatch bowtie_job.sh
-	 --export=i=8 sbatch bowtie_job.sh
-	 --export=i=9 sbatch bowtie_job.sh
-	 --export=i=10 sbatch bowtie_job.sh
+	sbatch --export=i=1 bowtie_job.sh
+	sbatch --export=i=2 bowtie_job.sh
+	sbatch --export=i=3 bowtie_job.sh
+	sbatch --export=i=4 bowtie_job.sh
+	sbatch --export=i=5 bowtie_job.sh
+	sbatch --export=i=6 bowtie_job.sh
+	sbatch --export=i=7 bowtie_job.sh
+	sbatch --export=i=8 bowtie_job.sh
+	sbatch --export=i=9 bowtie_job.sh
+	sbatch --export=i=10 bowtie_job.sh
 	 
 or, more elegantly,
 	
@@ -154,8 +154,43 @@ In array jobs a SLURM variable named SLURM_ARRAY_TASK_ID will contain a defined 
 	
 	bowtie ${bowtie_index} -p 8 test_${SLURM_ARRAY_TASK_ID}.fastq > test_${SLURM_ARRAY_TASK_ID}.bowtie_out
 
+## 3) sample table based processing
 
+Sample tables contain information on all samples within a project. They constitute the so-called meta-data. In such a table samples are usually organized in rows and the annotations in columns. Annotations might be, e.g. raw file name(s), genotype, antibody, treatment. Such a table might look like the following:
+
+ sample.name | input.fastq | ip.fastq | type
+---------- | ----------- | ----------- | ---------
+msl2 | s2.fastq | msl2.fastq | TF
+H4K16ac | s2.fastq | h4k16ac.fastq | histone
+
+Parallel processing of samples can be based on such tables. Using a job array the array ID now serves as a reference to a line within the sample table such that the job itself extracts the paramters from the table using this index number and the unix text processor `awk`.
+
+	#!/bin/bash
 	
+	#SBATCH --ntasks=8
+	#SBATCH --mem=20000
+	
+	module load ngs/bowtie1
+	
+	LINE_NO=$(echo ${SLURM_TASK_ID}+1 | bc) ## will set the row index, note: we have a header line to skip
+	##
+	input=$(awk -F '\t' - v line=${LINE_NO} -v field=2 'NR==line{print $field}' samples.txt)
+	ip=$(awk -F '\t' - v line=${LINE_NO} -v field=3 'NR==line{print $field}' samples.txt)
+	
+Additionally, such a sample table can serve as the central meta-data storage for the entire down-sream analysis as well.
+
+## 4) interactive shell
+
+Instead of delivering an full set of commands to the SLURM engine, it is also possible to work interactively in a SLURM job. In other words one can type commands line-by-line into a terminal window and get the immediate standard out feed back within a SLURM job.
+
+This is particularly helpful during development/debugging of a bigger chain of commands for. a SLURM shell script. The following command opens a session within a SLURM job. Note that just the prefix in  the terminal window changes. But now you are not working on the Master node any more but on a computation node within the slim18 set using 36 cores and default memory allocation.   
+
+	srun -p slim18 -I -c 36 --pty -t 0-99:00 /bin/bash
+
+For exiting simply type
+
+	exit
+
 <!-- Highlight syntax for Mou.app, insert at the bottom of the markdown document  -->
 <script src="http://yandex.st/highlightjs/7.3/highlight.min.js"></script>
 <link rel="stylesheet" href="http://yandex.st/highlightjs/7.3/styles/github.min.css">
